@@ -1,71 +1,74 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# All Vagrant configuration is done below. The "2" in Vagrant.configure
-# configures the configuration version (we support older styles for
-# backwards compatibility). Please don't change it unless you know what
-# you're doing.
+nodes = {
+  # prefix     => [count, ip_start, additional_disk_number]
+  'controller' => [1, 11, 0],
+  'network' => [1, 21, 0],
+  'compute' => [1, 31, 0],
+  'cinder' => [1, 41, 1],
+  'swift' => [2, 51, 2],
+}
+
 Vagrant.configure(2) do |config|
-  # The most common configuration options are documented and commented below.
-  # For a complete reference, please see the online documentation at
-  # https://docs.vagrantup.com.
+  config.vm.box = "hashicorp/precise64"
 
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = "ubuntu/trusty64"
+  nodes.each do |prefix, (count, ip_start, additional_disk_number)|
+    count.times do |i|
+      hostname = "%s%02d" % [prefix, (i+1)]
 
-  # Disable automatic box update checking. If you disable this, then
-  # boxes will only be checked for updates when the user runs
-  # `vagrant box outdated`. This is not recommended.
-  # config.vm.box_check_update = false
+      config.vm.define "#{hostname}" do |box|
+        box.vm.hostname = "#{hostname}.huzichun.com"
+        box.vm.network :private_network, ip: "10.0.0.#{ip_start+i}", :network => "255.255.255.0" 
+     
+        if prefix == "network"
+          box.vm.network :private_network, ip: "10.0.1.#{ip_start+i}", :network => "255.255.255.0"
+          box.vm.network :public_network, bridge: "en0: Wi-Fi (AirPort)"
+        elsif prefix == "compute"
+          box.vm.network :private_network, ip: "10.0.1.#{ip_start+i}", :network => "255.255.255.0"
+          box.vm.network :private_network, ip: "10.0.2.#{ip_start+i}", :network => "255.255.255.0"
+        elsif prefix == "cinder"
+          box.vm.network :private_network, ip: "10.0.2.#{ip_start+i}", :network => "255.255.255.0"
+        elsif prefix == "swift"
+          box.vm.network :private_network, ip: "10.0.2.#{ip_start+i}", :network => "255.255.255.0"
+        end 
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
+        box.vm.provider :virtualbox do |vb|
+          # customize the cpus and memory sizes.
+          if prefix == "controller"
+            vb.customize ["modifyvm", :id, "--memory", 2048]
+            vb.customize ["modifyvm", :id, "--cpus", 1]
+          elsif prefix == "network"
+            vb.customize ["modifyvm", :id, "--memory", 512]
+            vb.customize ["modifyvm", :id, "--cpus", 1]
+          elsif prefix == "compute"
+            vb.customize ["modifyvm", :id, "--memory", 2048]
+            vb.customize ["modifyvm", :id, "--cpus", 2]
+          elsif prefix == "cinder"
+            vb.customize ["modifyvm", :id, "--memory", 512]
+            vb.customize ["modifyvm", :id, "--cpus", 1]
+          elsif prefix == "swift"
+            vb.customize ["modifyvm", :id, "--memory", 1024]
+            vb.customize ["modifyvm", :id, "--cpus", 1]
+          end
 
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  # config.vm.network "private_network", ip: "192.168.33.10"
+          dir = File.join(File.dirname(__FILE__), "vagrant-additional-disk")
+          unless File.directory?(dir)
+            Dir.mkdir dir
+          end
 
-  # Create a public network, which generally matched to bridged network.
-  # Bridged networks make the machine appear as another physical device on
-  # your network.
-  # config.vm.network "public_network"
-
-  # Share an additional folder to the guest VM. The first argument is
-  # the path on the host to the actual folder. The second argument is
-  # the path on the guest to mount the folder. And the optional third
-  # argument is a set of non-required options.
-  # config.vm.synced_folder "../data", "/vagrant_data"
-
-  # Provider-specific configuration so you can fine-tune various
-  # backing providers for Vagrant. These expose provider-specific options.
-  # Example for VirtualBox:
-  #
-  # config.vm.provider "virtualbox" do |vb|
-  #   # Display the VirtualBox GUI when booting the machine
-  #   vb.gui = true
-  #
-  #   # Customize the amount of memory on the VM:
-  #   vb.memory = "1024"
-  # end
-  #
-  # View the documentation for the provider you are using for more
-  # information on available options.
-
-  # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
-  # such as FTP and Heroku are also available. See the documentation at
-  # https://docs.vagrantup.com/v2/push/atlas.html for more information.
-  # config.push.define "atlas" do |push|
-  #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
-  # end
-
-  # Enable provisioning with a shell script. Additional provisioners such as
-  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
-  # documentation for more information about their specific syntax and use.
-  # config.vm.provision "shell", inline: <<-SHELL
-  #   sudo apt-get update
-  #   sudo apt-get install -y apache2
-  # SHELL
+          if additional_disk_number > 0
+            disk_labels = 'b'..'z'
+            disk_labels.to_a.first(additional_disk_number).each_with_index do |disk, i|
+              file_to_disk = "#{dir}/#{hostname}-sd#{disk}.vdi"
+              unless File.exist?(file_to_disk)
+                vb.customize ["createhd", "--filename", file_to_disk, "--size", 20 * 1024]
+              end
+              vb.customize ["storageattach", :id, "--storagectl", "SATA Controller", "--port", (i+1).to_s, "--device", 0, "--type", "hdd", "--medium", file_to_disk]
+            end
+          end
+        end
+      end
+    end
+  end
 end
