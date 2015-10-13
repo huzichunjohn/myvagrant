@@ -1,0 +1,15 @@
+[controller]
+controller01 
+
+[network]
+network01
+
+[compute]
+compute01
+
+[cinder]
+cinder01
+
+[swift]
+swift01
+swift02

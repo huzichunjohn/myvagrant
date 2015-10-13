@@ -1,0 +1,6 @@
+---
+- hosts: all
+  sudo: true
+  tasks:
+    - name: just my test
+      shell: echo "hello world." 

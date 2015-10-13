@@ -34,7 +34,6 @@ Vagrant.configure(2) do |config|
         end 
 
         box.vm.provider :virtualbox do |vb|
-          # fix the ip address conflict on the first nat nic.
           vb.customize ["modifyvm", :id, "--natnet1", "192.168.200.0/24"]
           # customize the cpus and memory sizes.
           if prefix == "controller"
@@ -72,5 +71,9 @@ Vagrant.configure(2) do |config|
         end
       end
     end
+  end
+
+  config.vm.provision :ansible do |ansible|
+    ansible.playbook = "playbook.yml"
   end
 end
