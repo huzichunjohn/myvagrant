@@ -1,6 +1,8 @@
 ---
-- hosts: all
+- hosts: controller
   sudo: true
-  tasks:
-    - name: just my test
-      shell: echo "hello world." 
+  pre_tasks:
+    - name: just for test
+      shell: echo "hello world."
+  roles:
+    - role: nginx
