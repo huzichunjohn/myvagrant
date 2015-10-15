@@ -1,5 +1,8 @@
 ---
 - name: Install nginx web server
-  apt: pkg=nginx state=installed update_cache=true
+  apt: name=nginx state=installed
+
+- name: Copy nginx configuration for debmirror
+  template: src=debmirror.conf.j2 dest=/etc/nginx/conf.d/debmirror.conf
   notify:
-    - start nginx
+    - restart nginx

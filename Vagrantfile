@@ -10,12 +10,19 @@ nodes = {
   'swift' => [2, 51, 2],
 }
 
+groups = {}
+
 Vagrant.configure(2) do |config|
   config.vm.box = "hashicorp/precise64"
 
   nodes.each do |prefix, (count, ip_start, additional_disk_number)|
     count.times do |i|
       hostname = "%s%02d" % [prefix, (i+1)]
+      if groups[prefix]
+        groups[prefix].push(hostname)
+      else
+        groups[prefix] = [hostname]
+      end
 
       config.vm.define "#{hostname}" do |box|
         box.vm.hostname = "#{hostname}.huzichun.com"
@@ -35,6 +42,7 @@ Vagrant.configure(2) do |config|
 
         box.vm.provider :virtualbox do |vb|
           vb.customize ["modifyvm", :id, "--natnet1", "192.168.200.0/24"]
+          vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
           # customize the cpus and memory sizes.
           if prefix == "controller"
             vb.customize ["modifyvm", :id, "--memory", 2048]
@@ -74,6 +82,8 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.provision :ansible do |ansible|
+    #puts groups
     ansible.playbook = "playbook.yml"
+    ansible.groups = groups
   end
 end
